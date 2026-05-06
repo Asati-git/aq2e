@@ -1,131 +1,944 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#03050d" />
-    <title>Polymarket · Cosmos of Predictions</title>
-    <meta
-      name="description"
-      content="A 3D space visualization of every active Polymarket event. Glide through the cosmos of predictions."
-    />
-    <link rel="preconnect" href="https://gamma-api.polymarket.com" crossorigin />
-    <link rel="preconnect" href="https://polymarket-upload.s3.us-east-2.amazonaws.com" crossorigin />
-    <link rel="stylesheet" href="./style.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%2300eaff'/%3E%3Cstop offset='100%25' stop-color='%237b2bff' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect fill='%23030514' width='32' height='32' rx='8'/%3E%3Ccircle cx='16' cy='16' r='12' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='3' fill='white'/%3E%3C/svg%3E"
-    />
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
+<head>
+<meta charset="UTF-8" />
+<title>3D Glass Aquarium with Clownfish</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(180deg, #0a1628 0%, #1a3a5c 100%);
+    font-family: sans-serif;
+  }
+  #info {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: #b3e5fc;
+    font-size: 13px;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    z-index: 10;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="info">Drag to rotate &middot; Scroll to zoom &middot; Right-drag to pan</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- Renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// ---------- Scene ----------
+const scene = new THREE.Scene();
+
+// Background - canvas gradient with animated caustics overlay
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = 1024; bgCanvas.height = 1024;
+const bgCtx = bgCanvas.getContext('2d');
+function drawBg(time) {
+  const g = bgCtx.createLinearGradient(0, 0, 0, 1024);
+  g.addColorStop(0, '#0a1628');
+  g.addColorStop(1, '#1a3a5c');
+  bgCtx.fillStyle = g;
+  bgCtx.fillRect(0, 0, 1024, 1024);
+  // subtle caustic light blobs
+  for (let i = 0; i < 18; i++) {
+    const x = ((Math.sin(time * 0.0003 + i * 1.7) * 0.5 + 0.5) * 1024);
+    const y = ((Math.cos(time * 0.00021 + i * 2.3) * 0.5 + 0.5) * 1024);
+    const r = 80 + 40 * Math.sin(time * 0.0005 + i);
+    const grad = bgCtx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(135, 206, 250, 0.10)');
+    grad.addColorStop(1, 'rgba(135, 206, 250, 0)');
+    bgCtx.fillStyle = grad;
+    bgCtx.fillRect(0, 0, 1024, 1024);
+  }
+}
+drawBg(0);
+const bgTexture = new THREE.CanvasTexture(bgCanvas);
+bgTexture.colorSpace = THREE.SRGBColorSpace;
+scene.background = bgTexture;
+
+// ---------- Camera ----------
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(7, 3, 8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.target.set(0, 0, 0);
+controls.minDistance = 5;
+controls.maxDistance = 20;
+controls.maxPolarAngle = Math.PI * 0.55;
+
+// ---------- Lighting ----------
+const ambient = new THREE.AmbientLight(0xb3e5fc, 0.4);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xfff8e1, 1.0);
+dirLight.position.set(5, 10, 7);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 30;
+dirLight.shadow.camera.left = -8;
+dirLight.shadow.camera.right = 8;
+dirLight.shadow.camera.top = 8;
+dirLight.shadow.camera.bottom = -8;
+dirLight.shadow.bias = -0.0005;
+scene.add(dirLight);
+
+// Aquarium "lamp" point light at top
+const lampLight = new THREE.PointLight(0xffe0b2, 0.8, 12, 1.4);
+lampLight.position.set(0, 1.7, 0);
+scene.add(lampLight);
+
+// soft fill from below
+const fillLight = new THREE.DirectionalLight(0x4fc3f7, 0.25);
+fillLight.position.set(-3, -2, 4);
+scene.add(fillLight);
+
+// ---------- Aquarium dimensions ----------
+const TANK = { w: 6, d: 4, h: 3 };
+const halfW = TANK.w / 2, halfD = TANK.d / 2, halfH = TANK.h / 2;
+
+const aquariumGroup = new THREE.Group();
+scene.add(aquariumGroup);
+
+// Glass material
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xe0f7fa,
+  metalness: 0,
+  roughness: 0.05,
+  transmission: 0.95,
+  thickness: 0.15,
+  ior: 1.5,
+  transparent: true,
+  opacity: 0.18,
+  side: THREE.DoubleSide,
+  clearcoat: 0.5,
+  clearcoatRoughness: 0.05,
+  envMapIntensity: 1.0
+});
+
+const glassThickness = 0.06;
+
+function makeGlassPanel(w, h, d) {
+  const geom = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(geom, glassMat);
+  m.castShadow = false;
+  m.receiveShadow = true;
+  return m;
+}
+
+// 4 walls + bottom (top open)
+const front = makeGlassPanel(TANK.w, TANK.h, glassThickness);
+front.position.set(0, 0, halfD);
+aquariumGroup.add(front);
+
+const back = makeGlassPanel(TANK.w, TANK.h, glassThickness);
+back.position.set(0, 0, -halfD);
+aquariumGroup.add(back);
+
+const left = makeGlassPanel(glassThickness, TANK.h, TANK.d);
+left.position.set(-halfW, 0, 0);
+aquariumGroup.add(left);
+
+const right = makeGlassPanel(glassThickness, TANK.h, TANK.d);
+right.position.set(halfW, 0, 0);
+aquariumGroup.add(right);
+
+const bottomGlass = makeGlassPanel(TANK.w, glassThickness, TANK.d);
+bottomGlass.position.set(0, -halfH, 0);
+aquariumGroup.add(bottomGlass);
+
+// Wooden / matte black rim along top edges
+const rimMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7, metalness: 0.2 });
+const rimThickness = 0.12;
+const rimHeight = 0.18;
+
+function makeRim(w, h, d, x, y, z) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(g, rimMat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+const rimTopY = halfH + rimHeight / 2 - 0.02;
+aquariumGroup.add(makeRim(TANK.w + rimThickness * 2, rimHeight, rimThickness, 0, rimTopY, halfD + rimThickness / 2 - 0.02));
+aquariumGroup.add(makeRim(TANK.w + rimThickness * 2, rimHeight, rimThickness, 0, rimTopY, -halfD - rimThickness / 2 + 0.02));
+aquariumGroup.add(makeRim(rimThickness, rimHeight, TANK.d, -halfW - rimThickness / 2 + 0.02, rimTopY, 0));
+aquariumGroup.add(makeRim(rimThickness, rimHeight, TANK.d, halfW + rimThickness / 2 - 0.02, rimTopY, 0));
+
+// Bottom rim (base)
+aquariumGroup.add(makeRim(TANK.w + rimThickness * 2, rimHeight * 1.2, TANK.d + rimThickness * 2, 0, -halfH - rimHeight * 0.6 - 0.02, 0));
+
+// ---------- Water volume with animated top surface ----------
+const waterMat = new THREE.MeshPhysicalMaterial({
+  color: 0x1e88e5,
+  transparent: true,
+  opacity: 0.18,
+  roughness: 0.2,
+  metalness: 0,
+  transmission: 0.5,
+  thickness: 0.5,
+  side: THREE.DoubleSide
+});
+
+// Water box (slightly smaller than tank)
+const waterMargin = 0.03;
+const waterW = TANK.w - waterMargin * 2 - glassThickness * 2;
+const waterD = TANK.d - waterMargin * 2 - glassThickness * 2;
+const waterH = TANK.h - 0.25; // a bit below the top
+const waterBox = new THREE.BoxGeometry(waterW, waterH, waterD, 1, 1, 1);
+const waterMesh = new THREE.Mesh(waterBox, waterMat);
+waterMesh.position.y = -halfH + waterH / 2 + 0.02;
+aquariumGroup.add(waterMesh);
+
+// Animated water surface (top plane with vertex displacement)
+const surfaceGeom = new THREE.PlaneGeometry(waterW, waterD, 60, 40);
+surfaceGeom.rotateX(-Math.PI / 2);
+const surfaceMat = new THREE.MeshPhysicalMaterial({
+  color: 0x4fc3f7,
+  transparent: true,
+  opacity: 0.45,
+  roughness: 0.1,
+  metalness: 0,
+  transmission: 0.7,
+  thickness: 0.1,
+  side: THREE.DoubleSide
+});
+const waterSurface = new THREE.Mesh(surfaceGeom, surfaceMat);
+waterSurface.position.y = -halfH + waterH + 0.02;
+aquariumGroup.add(waterSurface);
+const surfaceBasePositions = surfaceGeom.attributes.position.array.slice();
+
+// ---------- Gravel / Stones ----------
+const gravelGroup = new THREE.Group();
+aquariumGroup.add(gravelGroup);
+
+const stoneColors = [0x8D6E63, 0xA1887F, 0x9E9E9E, 0x6D4C41, 0xBCAAA4, 0x795548];
+const stoneCount = 22;
+for (let i = 0; i < stoneCount; i++) {
+  const big = Math.random() < 0.2;
+  const r = (big ? 0.18 : 0.08) + Math.random() * 0.12;
+  const geom = Math.random() < 0.5
+    ? new THREE.DodecahedronGeometry(r, 0)
+    : new THREE.SphereGeometry(r, 8, 6);
+  // squash
+  const sx = 0.9 + Math.random() * 0.4;
+  const sy = 0.4 + Math.random() * 0.3;
+  const sz = 0.9 + Math.random() * 0.4;
+  geom.scale(sx, sy, sz);
+  // jitter vertices
+  const pos = geom.attributes.position;
+  for (let v = 0; v < pos.count; v++) {
+    pos.setXYZ(
+      v,
+      pos.getX(v) + (Math.random() - 0.5) * 0.04,
+      pos.getY(v) + (Math.random() - 0.5) * 0.04,
+      pos.getZ(v) + (Math.random() - 0.5) * 0.04
+    );
+  }
+  geom.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    color: stoneColors[Math.floor(Math.random() * stoneColors.length)],
+    roughness: 0.85,
+    metalness: 0.05
+  });
+  const stone = new THREE.Mesh(geom, mat);
+  stone.position.set(
+    (Math.random() - 0.5) * (TANK.w - 0.6),
+    -halfH + r * sy + 0.02,
+    (Math.random() - 0.5) * (TANK.d - 0.6)
+  );
+  stone.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  stone.castShadow = true;
+  stone.receiveShadow = true;
+  gravelGroup.add(stone);
+}
+
+// Sand layer underneath
+const sandGeom = new THREE.PlaneGeometry(TANK.w - 0.1, TANK.d - 0.1, 32, 32);
+sandGeom.rotateX(-Math.PI / 2);
+const sandPos = sandGeom.attributes.position;
+for (let i = 0; i < sandPos.count; i++) {
+  sandPos.setY(i, sandPos.getY(i) + Math.random() * 0.04);
+}
+sandGeom.computeVertexNormals();
+const sandMat = new THREE.MeshStandardMaterial({ color: 0xc9b78c, roughness: 0.95 });
+const sand = new THREE.Mesh(sandGeom, sandMat);
+sand.position.y = -halfH + 0.03;
+sand.receiveShadow = true;
+aquariumGroup.add(sand);
+
+// ---------- Aquatic plants ----------
+const plantsGroup = new THREE.Group();
+aquariumGroup.add(plantsGroup);
+
+const plantColors = [0x2E7D32, 0x388E3C, 0x1B5E20, 0x4CAF50, 0x66BB6A];
+const plantBlades = []; // store for sway animation
+
+function makePlantCluster(cx, cz) {
+  const cluster = new THREE.Group();
+  const bladeCount = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < bladeCount; i++) {
+    const height = 1.0 + Math.random() * 1.2;
+    const width = 0.08 + Math.random() * 0.06;
+    const segments = 8;
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(width / 4, height);
+    shape.lineTo(-width / 4, height);
+    shape.lineTo(-width / 2, 0);
+    const geom = new THREE.ShapeGeometry(shape, 6);
+    // subdivide vertically by adding more vertices is complex; instead use a PlaneGeometry approach
+    const plane = new THREE.PlaneGeometry(width, height, 1, segments);
+    plane.translate(0, height / 2, 0);
+    // taper
+    const pp = plane.attributes.position;
+    for (let v = 0; v < pp.count; v++) {
+      const y = pp.getY(v);
+      const t = y / height;
+      const taper = 1 - t * 0.6;
+      pp.setX(v, pp.getX(v) * taper);
+    }
+    plane.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: plantColors[Math.floor(Math.random() * plantColors.length)],
+      side: THREE.DoubleSide,
+      roughness: 0.8,
+      metalness: 0
+    });
+    const blade = new THREE.Mesh(plane, mat);
+    blade.castShadow = true;
+    blade.receiveShadow = true;
+    const bx = (Math.random() - 0.5) * 0.5;
+    const bz = (Math.random() - 0.5) * 0.5;
+    blade.position.set(bx, 0, bz);
+    blade.rotation.y = Math.random() * Math.PI * 2;
+    blade.userData.basePositions = plane.attributes.position.array.slice();
+    blade.userData.height = height;
+    blade.userData.phase = Math.random() * Math.PI * 2;
+    blade.userData.swayAmp = 0.05 + Math.random() * 0.05;
+    plantBlades.push(blade);
+    cluster.add(blade);
+  }
+  cluster.position.set(cx, -halfH + 0.05, cz);
+  return cluster;
+}
+
+// Place 4 plant clusters
+plantsGroup.add(makePlantCluster(-TANK.w * 0.35, -TANK.d * 0.3));
+plantsGroup.add(makePlantCluster(TANK.w * 0.3, -TANK.d * 0.32));
+plantsGroup.add(makePlantCluster(-TANK.w * 0.25, TANK.d * 0.3));
+plantsGroup.add(makePlantCluster(TANK.w * 0.38, TANK.d * 0.25));
+
+// ---------- Clownfish factory ----------
+function createClownfish(scale = 1) {
+  const fish = new THREE.Group();
+
+  // Body materials
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0xFF6D00,
+    roughness: 0.45,
+    metalness: 0.15
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xfafafa,
+    roughness: 0.5,
+    metalness: 0.1
+  });
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6,
+    metalness: 0.1
+  });
+  const finMat = new THREE.MeshStandardMaterial({
+    color: 0xFF6D00,
+    roughness: 0.5,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.95
+  });
+  const finEdgeMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  });
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.2,
+    metalness: 0.3
+  });
+  const pupilMat = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    roughness: 0.2,
+    metalness: 0.4
+  });
+
+  // Body — elongated ellipsoid (sphere stretched on Z, squashed on X)
+  const bodyGeom = new THREE.SphereGeometry(0.5, 32, 24);
+  // Make body fish-shaped: elongate Z, taper towards tail
+  const bp = bodyGeom.attributes.position;
+  for (let i = 0; i < bp.count; i++) {
+    const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
+    // Elongate forward (positive z = head)
+    let nz = z * 1.6;
+    // taper toward tail (negative z)
+    const t = (z + 0.5) / 1.0; // 0 at tail, 1 at head
+    let taper = 0.55 + 0.45 * t; // narrower at tail
+    let nx = x * 0.55 * taper;
+    let ny = y * 0.85 * taper;
+    // make belly slightly fuller
+    if (ny < 0) ny *= 1.05;
+    bp.setXYZ(i, nx, ny, nz);
+  }
+  bodyGeom.computeVertexNormals();
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  fish.add(body);
+
+  // White stripes — three vertical rings using TorusGeometry, oriented around the body's local Z axis
+  // Stripe positions (along Z, head=+, tail=-)
+  function makeStripe(zPos, halfWidth, color) {
+    // approximate body radius at this z
+    const t = (zPos + 0.5) / 1.0;
+    const taper = 0.55 + 0.45 * t;
+    const rx = 0.5 * 0.55 * taper * 1.02;
+    const ry = 0.5 * 0.85 * taper * 1.02;
+    // build a thin ring as a torus then scale to ellipse
+    const ring = new THREE.TorusGeometry(1, halfWidth, 8, 32);
+    // rotate so torus plane is XY (around Z axis)
+    ring.rotateY(Math.PI / 2);
+    // rotate again so the torus is in the XY plane
+    ring.rotateX(Math.PI / 2);
+    const mesh = new THREE.Mesh(ring, color);
+    mesh.scale.set(rx, ry, halfWidth);
+    mesh.position.z = zPos * 1.6;
+    return mesh;
+  }
+
+  // We'll instead build stripes as flat rings using SphereGeometry "shell" sections.
+  // Use thin disc shells aligned to Z:
+  function makeShellStripe(zPos, halfWidth, mat) {
+    // Build by carving a thin slab of a slightly larger ellipsoid
+    const g = new THREE.SphereGeometry(0.51, 32, 24);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      let nz = z * 1.6;
+      const t = (z + 0.5) / 1.0;
+      const taper = 0.55 + 0.45 * t;
+      let nx = x * 0.55 * taper * 1.012;
+      let ny = y * 0.85 * taper * 1.012;
+      if (ny < 0) ny *= 1.05;
+      pos.setXYZ(i, nx, ny, nz);
+    }
+    g.computeVertexNormals();
+    // Now mask: only keep faces near nz = zPos * 1.6 within halfWidth
+    // Easier: use a custom shader-free trick — build a thin band by trimming via groups isn't trivial.
+    // Instead, build a ring using a custom geometry:
+    return null;
+  }
+
+  // Build stripes as parametric thin rings hugging body surface
+  function makeBandRing(zPos, halfWidth, mat, edge = false) {
+    const segments = 48;
+    const radial = 6;
+    const bandGeom = new THREE.BufferGeometry();
+    const verts = [];
+    const indices = [];
+    for (let i = 0; i <= segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      for (let j = 0; j <= radial; j++) {
+        const tj = j / radial; // 0 to 1
+        const localZ = (zPos - halfWidth + tj * halfWidth * 2);
+        // body shape at localZ
+        const t = (localZ + 0.5) / 1.0;
+        const taper = Math.max(0, 0.55 + 0.45 * t);
+        const r = 1.025; // slightly outside body
+        const rx = 0.5 * 0.55 * taper * r;
+        const ry = 0.5 * 0.85 * taper * r;
+        const x = Math.cos(a) * rx;
+        const y = Math.sin(a) * ry;
+        const z = localZ * 1.6;
+        verts.push(x, y, z);
       }
-    </script>
-  </head>
-  <body>
-    <canvas id="scene" aria-label="3D cosmos of Polymarket events"></canvas>
+    }
+    for (let i = 0; i < segments; i++) {
+      for (let j = 0; j < radial; j++) {
+        const a = i * (radial + 1) + j;
+        const b = a + 1;
+        const c = a + (radial + 1);
+        const d = c + 1;
+        indices.push(a, c, b);
+        indices.push(b, c, d);
+      }
+    }
+    bandGeom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    bandGeom.setIndex(indices);
+    bandGeom.computeVertexNormals();
+    return new THREE.Mesh(bandGeom, mat);
+  }
 
-    <!-- Loader -->
-    <div id="loader" class="loader" role="status" aria-live="polite">
-      <div class="loader-ring"></div>
-      <div class="loader-text">
-        <span class="loader-title">Charting the cosmos…</span>
-        <span class="loader-sub" id="loader-sub">Pulling active markets from Polymarket</span>
-      </div>
-    </div>
+  // Three white stripes at z = +0.28 (head), 0.0 (mid), -0.28 (tail-ish)
+  const stripeWidths = [0.06, 0.07, 0.06];
+  const stripeZ = [0.28, 0.0, -0.26];
+  for (let i = 0; i < 3; i++) {
+    // black edge (slightly wider)
+    const edge = makeBandRing(stripeZ[i], stripeWidths[i] + 0.012, blackMat);
+    fish.add(edge);
+    const white = makeBandRing(stripeZ[i], stripeWidths[i], whiteMat);
+    fish.add(white);
+  }
 
-    <!-- Top bar -->
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">
-          <span class="brand-core"></span>
-          <span class="brand-ring"></span>
-        </div>
-        <div class="brand-text">
-          <div class="brand-name">Polymarket Cosmos</div>
-          <div class="brand-sub">a 3D map of active predictions</div>
-        </div>
-      </div>
-      <div class="topbar-actions">
-        <div class="search">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"
-            />
-          </svg>
-          <input id="search" type="search" placeholder="Search markets…" autocomplete="off" />
-        </div>
-        <a class="btn-link" href="https://polymarket.com" target="_blank" rel="noopener"
-          >Open Polymarket ↗</a
-        >
-      </div>
-    </header>
+  // Eyes — placed on the head area (positive Z)
+  function makeEye(side) {
+    const eye = new THREE.Group();
+    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), eyeWhiteMat);
+    eye.add(sclera);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), pupilMat);
+    pupil.position.set(0, 0, 0.04);
+    eye.add(pupil);
+    const highlight = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), eyeWhiteMat);
+    highlight.position.set(0.015, 0.02, 0.07);
+    eye.add(highlight);
+    // place on side of head
+    const headZ = 0.55;
+    const sideSign = side === 'left' ? 1 : -1;
+    eye.position.set(sideSign * 0.16, 0.06, headZ);
+    eye.rotation.y = sideSign * Math.PI / 2;
+    return eye;
+  }
+  fish.add(makeEye('left'));
+  fish.add(makeEye('right'));
 
-    <!-- HUD -->
-    <aside class="hud" aria-hidden="true">
-      <div class="hud-row"><span class="hud-k">Markets</span><span class="hud-v" id="stat-count">0</span></div>
-      <div class="hud-row"><span class="hud-k">Total volume</span><span class="hud-v" id="stat-volume">$0</span></div>
-      <div class="hud-row"><span class="hud-k">24h volume</span><span class="hud-v" id="stat-volume24">$0</span></div>
-      <div class="hud-row hud-legend">
-        <span class="dot dot-blue"></span><span>cool · low activity</span>
-      </div>
-      <div class="hud-row hud-legend">
-        <span class="dot dot-pink"></span><span>hot · high 24h volume</span>
-      </div>
-    </aside>
+  // Mouth — small dark indentation
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), blackMat);
+  mouth.position.set(0, -0.05, 0.78);
+  mouth.scale.set(1, 0.5, 0.5);
+  fish.add(mouth);
 
-    <!-- Tooltip following cursor on hover -->
-    <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
+  // Tail (caudal fin) — flat fan, rigged for wagging via group pivot
+  const tailPivot = new THREE.Group();
+  tailPivot.position.set(0, 0, -0.78);
+  fish.add(tailPivot);
 
-    <!-- Detail panel -->
-    <section id="panel" class="panel" aria-hidden="true">
-      <button class="panel-close" id="panel-close" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="18" height="18">
-          <path
-            d="M6 6l12 12M18 6L6 18"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
-      <div class="panel-image" id="panel-image" aria-hidden="true"></div>
-      <h2 class="panel-title" id="panel-title">—</h2>
-      <p class="panel-desc" id="panel-desc"></p>
-      <div class="panel-stats">
-        <div><span class="stat-k">Volume</span><span class="stat-v" id="panel-volume">—</span></div>
-        <div><span class="stat-k">24h</span><span class="stat-v" id="panel-volume24">—</span></div>
-        <div><span class="stat-k">Liquidity</span><span class="stat-v" id="panel-liquidity">—</span></div>
-        <div><span class="stat-k">Ends</span><span class="stat-v" id="panel-end">—</span></div>
-      </div>
-      <div class="panel-markets" id="panel-markets"></div>
-      <a class="panel-cta" id="panel-cta" href="https://polymarket.com" target="_blank" rel="noopener">
-        Trade on Polymarket
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path
-            d="M7 17L17 7M9 7h8v8"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </a>
-    </section>
+  // Tail shape (forked)
+  const tailShape = new THREE.Shape();
+  tailShape.moveTo(0, 0);
+  tailShape.lineTo(-0.4, 0.35);
+  tailShape.lineTo(-0.5, 0.15);
+  tailShape.lineTo(-0.3, 0.0);
+  tailShape.lineTo(-0.5, -0.15);
+  tailShape.lineTo(-0.4, -0.35);
+  tailShape.lineTo(0, 0);
+  const tailGeom = new THREE.ShapeGeometry(tailShape, 16);
+  tailGeom.rotateY(Math.PI / 2);
+  // The tail should extend in the -Z direction; the shape extends in -X above.
+  // We rotate the geometry so the shape lies in the YZ plane, with its "long" axis along -Z.
+  // Easier: rebuild the tail with explicit YZ plane points.
+  const tailShape2 = new THREE.Shape();
+  tailShape2.moveTo(0, 0);
+  tailShape2.lineTo(-0.4, 0.35);
+  tailShape2.lineTo(-0.5, 0.15);
+  tailShape2.lineTo(-0.3, 0.0);
+  tailShape2.lineTo(-0.5, -0.15);
+  tailShape2.lineTo(-0.4, -0.35);
+  tailShape2.lineTo(0, 0);
+  const tailGeom2 = new THREE.ShapeGeometry(tailShape2);
+  // Currently in XY plane. We want it in YZ plane, with X = 0 (so it's flat horizontally? No, fish tail is vertical).
+  // Fish tail is a vertical fin that wags side-to-side. So tail should be in the XY plane normal? Actually it should be in YZ plane (vertical, extending backward in -Z).
+  // After rotation around Y by 90°: x -> -z, z -> x. So XY plane shape rotated 90° about Y becomes (-z)Y plane, i.e. YZ plane with the original X axis now along -Z.
+  tailGeom2.rotateY(Math.PI / 2);
+  const tail = new THREE.Mesh(tailGeom2, finMat);
+  tail.castShadow = true;
+  // black edge on tail — slightly larger duplicate behind
+  const tailEdge = new THREE.Mesh(tailGeom2.clone().scale(1.08, 1.08, 1.08), blackMat);
+  tailEdge.position.x = -0.001;
+  tailPivot.add(tailEdge);
+  tailPivot.add(tail);
 
-    <!-- Bottom hint -->
-    <div class="hint">
-      <kbd>drag</kbd> orbit · <kbd>scroll</kbd> zoom · <kbd>click</kbd> a star to inspect
-    </div>
+  // Dorsal fin (top)
+  const dorsalShape = new THREE.Shape();
+  dorsalShape.moveTo(-0.4, 0);
+  dorsalShape.lineTo(-0.2, 0.3);
+  dorsalShape.lineTo(0.0, 0.35);
+  dorsalShape.lineTo(0.2, 0.3);
+  dorsalShape.lineTo(0.4, 0);
+  dorsalShape.lineTo(-0.4, 0);
+  const dorsalGeom = new THREE.ShapeGeometry(dorsalShape);
+  // Place in XY plane at top — we want it in XZ plane vertical fin with the curved edge up.
+  // Rotate around X by -90? Actually dorsal is a vertical fin too, plane is XZ? No - dorsal sticks up, so plane should be XZ (horizontal? no it sticks up vertically).
+  // Dorsal fin is a thin sail extending upward and backward. It's a thin sheet whose plane is XZ — width along Z (front-back of fish), height along Y. So it's in the YZ plane actually (X=0).
+  dorsalGeom.rotateY(Math.PI / 2);
+  const dorsal = new THREE.Mesh(dorsalGeom, finMat);
+  const dorsalEdge = new THREE.Mesh(dorsalGeom.clone().scale(1.06, 1.06, 1.06), blackMat);
+  const dorsalPivot = new THREE.Group();
+  dorsalPivot.position.set(0, 0.3, 0);
+  dorsalEdge.position.x = -0.001;
+  dorsalPivot.add(dorsalEdge);
+  dorsalPivot.add(dorsal);
+  fish.add(dorsalPivot);
 
-    <script type="module" src="./app.js"></script>
-  </body>
+  // Anal fin (bottom near tail)
+  const analShape = new THREE.Shape();
+  analShape.moveTo(-0.2, 0);
+  analShape.lineTo(-0.1, -0.18);
+  analShape.lineTo(0.05, -0.2);
+  analShape.lineTo(0.18, -0.05);
+  analShape.lineTo(0.2, 0);
+  analShape.lineTo(-0.2, 0);
+  const analGeom = new THREE.ShapeGeometry(analShape);
+  analGeom.rotateY(Math.PI / 2);
+  const analFin = new THREE.Mesh(analGeom, finMat);
+  analFin.position.set(0, -0.3, -0.2);
+  fish.add(analFin);
+
+  // Pectoral fins (sides)
+  function makePectoral(side) {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0);
+    s.lineTo(0.3, 0.05);
+    s.lineTo(0.35, -0.1);
+    s.lineTo(0.2, -0.18);
+    s.lineTo(0, 0);
+    const g = new THREE.ShapeGeometry(s);
+    // Pectoral fins lie roughly horizontally extending from sides; plane in XY would extend horizontally, but we want them on the side, plane facing up/down (XZ plane).
+    // Easier: rotate XY shape so fin lies in XZ plane via rotateX(Math.PI/2).
+    g.rotateX(-Math.PI / 2);
+    const fin = new THREE.Mesh(g, finMat);
+    const pivot = new THREE.Group();
+    const sideSign = side === 'left' ? 1 : -1;
+    pivot.position.set(sideSign * 0.18, -0.05, 0.25);
+    pivot.rotation.z = sideSign * 0.2;
+    fin.scale.x = sideSign;
+    pivot.add(fin);
+    return pivot;
+  }
+  const pecLeft = makePectoral('left');
+  const pecRight = makePectoral('right');
+  fish.add(pecLeft);
+  fish.add(pecRight);
+
+  // Apply scale
+  fish.scale.setScalar(scale);
+
+  // Animation handles
+  fish.userData = {
+    tailPivot,
+    dorsalPivot,
+    pecLeft,
+    pecRight,
+    scale
+  };
+
+  // Fish faces +Z by default; we'll rotate fish to face -Z (forward direction in our convention), so swap:
+  // Actually let's say fish forward is +Z (head at +Z). Movement code will use this.
+  return fish;
+}
+
+// ---------- Spawn 3 fish ----------
+const fishes = [];
+const fishScales = [0.9, 1.0, 1.1];
+const fishMargin = 0.5;
+const swimBounds = {
+  minX: -halfW + fishMargin,
+  maxX: halfW - fishMargin,
+  minY: -halfH + fishMargin + 0.2,
+  maxY: -halfH + waterH - fishMargin,
+  minZ: -halfD + fishMargin,
+  maxZ: halfD - fishMargin
+};
+
+for (let i = 0; i < 3; i++) {
+  const f = createClownfish(fishScales[i]);
+  // Random position
+  f.position.set(
+    THREE.MathUtils.randFloat(swimBounds.minX, swimBounds.maxX),
+    THREE.MathUtils.randFloat(swimBounds.minY, swimBounds.maxY),
+    THREE.MathUtils.randFloat(swimBounds.minZ, swimBounds.maxZ)
+  );
+  f.userData.target = randomTarget();
+  f.userData.speed = 0.005 + Math.random() * 0.010; // 0.005 - 0.015 / frame at 60fps
+  f.userData.tailPhase = Math.random() * Math.PI * 2;
+  f.userData.bankAngle = 0;
+  f.userData.forward = new THREE.Vector3(0, 0, 1);
+  scene.add(f);
+  fishes.push(f);
+}
+
+function randomTarget() {
+  return new THREE.Vector3(
+    THREE.MathUtils.randFloat(swimBounds.minX, swimBounds.maxX),
+    THREE.MathUtils.randFloat(swimBounds.minY, swimBounds.maxY),
+    THREE.MathUtils.randFloat(swimBounds.minZ, swimBounds.maxZ)
+  );
+}
+
+// ---------- Bubbles ----------
+const bubbles = [];
+const bubbleMat = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  transmission: 0.9,
+  roughness: 0.05,
+  metalness: 0,
+  thickness: 0.2,
+  ior: 1.33,
+  transparent: true,
+  opacity: 0.4,
+  iridescence: 0.4,
+  iridescenceIOR: 1.3,
+  clearcoat: 0.8,
+  clearcoatRoughness: 0.05
+});
+
+const bubbleSpawnPoints = [
+  new THREE.Vector3(-TANK.w * 0.32, -halfH + 0.1, TANK.d * 0.28),
+  new THREE.Vector3(TANK.w * 0.32, -halfH + 0.1, -TANK.d * 0.28)
+];
+
+let bubbleSpawnTimer = 0;
+
+function spawnBubble() {
+  const point = bubbleSpawnPoints[Math.floor(Math.random() * bubbleSpawnPoints.length)];
+  const r = 0.025 + Math.random() * 0.04;
+  const geom = new THREE.SphereGeometry(r, 12, 10);
+  const b = new THREE.Mesh(geom, bubbleMat);
+  b.position.copy(point);
+  b.position.x += (Math.random() - 0.5) * 0.1;
+  b.position.z += (Math.random() - 0.5) * 0.1;
+  b.userData = {
+    speed: 0.02 + Math.random() * 0.025,
+    wobblePhase: Math.random() * Math.PI * 2,
+    wobbleAmp: 0.05 + Math.random() * 0.1,
+    baseX: b.position.x,
+    baseZ: b.position.z,
+    initialR: r
+  };
+  scene.add(b);
+  bubbles.push(b);
+}
+
+// ---------- Caustic light pattern on bottom (simple animated texture) ----------
+const causticCanvas = document.createElement('canvas');
+causticCanvas.width = 256; causticCanvas.height = 256;
+const cCtx = causticCanvas.getContext('2d');
+function drawCaustics(t) {
+  cCtx.fillStyle = 'rgba(0,0,0,1)';
+  cCtx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 14; i++) {
+    const x = (Math.sin(t * 0.0008 + i * 1.3) * 0.5 + 0.5) * 256;
+    const y = (Math.cos(t * 0.0011 + i * 2.1) * 0.5 + 0.5) * 256;
+    const r = 30 + 20 * Math.sin(t * 0.002 + i);
+    const grad = cCtx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(180, 230, 255, 0.6)');
+    grad.addColorStop(1, 'rgba(180, 230, 255, 0)');
+    cCtx.fillStyle = grad;
+    cCtx.fillRect(0, 0, 256, 256);
+  }
+}
+drawCaustics(0);
+const causticTex = new THREE.CanvasTexture(causticCanvas);
+causticTex.colorSpace = THREE.SRGBColorSpace;
+
+const causticPlaneGeom = new THREE.PlaneGeometry(TANK.w - 0.2, TANK.d - 0.2);
+causticPlaneGeom.rotateX(-Math.PI / 2);
+const causticMat = new THREE.MeshBasicMaterial({
+  map: causticTex,
+  transparent: true,
+  opacity: 0.35,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const causticPlane = new THREE.Mesh(causticPlaneGeom, causticMat);
+causticPlane.position.y = -halfH + 0.08;
+aquariumGroup.add(causticPlane);
+
+// ---------- Animation Loop ----------
+const clock = new THREE.Clock();
+const tmpVec = new THREE.Vector3();
+const tmpQuat = new THREE.Quaternion();
+const tmpQuat2 = new THREE.Quaternion();
+const upVec = new THREE.Vector3(0, 1, 0);
+// Fish model has head at +Z local, but Three.js lookAt makes -Z face target.
+// We post-multiply by a 180° Y rotation so the +Z (head) ends up facing the target.
+const flipForwardQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = clock.elapsedTime;
+  const tMs = t * 1000;
+
+  // Background caustics
+  if (Math.floor(t * 10) % 2 === 0) {
+    drawBg(tMs);
+    bgTexture.needsUpdate = true;
+  }
+  drawCaustics(tMs);
+  causticTex.needsUpdate = true;
+  causticPlane.material.opacity = 0.25 + Math.sin(t * 0.7) * 0.08;
+
+  // Water surface ripple
+  const sp = waterSurface.geometry.attributes.position;
+  for (let i = 0; i < sp.count; i++) {
+    const ix = i * 3;
+    const x = surfaceBasePositions[ix];
+    const z = surfaceBasePositions[ix + 2];
+    const y = Math.sin(x * 2.0 + t * 1.5) * 0.025
+            + Math.cos(z * 2.5 + t * 1.2) * 0.025
+            + Math.sin((x + z) * 1.5 + t * 0.8) * 0.015;
+    sp.setY(i, y);
+  }
+  sp.needsUpdate = true;
+  waterSurface.geometry.computeVertexNormals();
+
+  // Plant sway
+  for (const blade of plantBlades) {
+    const pos = blade.geometry.attributes.position;
+    const base = blade.userData.basePositions;
+    const h = blade.userData.height;
+    const phase = blade.userData.phase;
+    const amp = blade.userData.swayAmp;
+    for (let v = 0; v < pos.count; v++) {
+      const ix = v * 3;
+      const by = base[ix + 1];
+      const bx = base[ix];
+      const bz = base[ix + 2];
+      const tFac = Math.max(0, by / h);
+      const sway = Math.sin(t * 1.5 + phase + by * 1.5) * amp * tFac * tFac;
+      pos.setX(v, bx + sway);
+      pos.setZ(v, bz + sway * 0.4);
+    }
+    pos.needsUpdate = true;
+  }
+
+  // Fish behavior
+  for (const fish of fishes) {
+    const ud = fish.userData;
+    // Direction toward target
+    tmpVec.copy(ud.target).sub(fish.position);
+    const dist = tmpVec.length();
+    if (dist < 0.4) {
+      ud.target = randomTarget();
+      tmpVec.copy(ud.target).sub(fish.position);
+    }
+    tmpVec.normalize();
+
+    // Smoothly turn forward toward tmpVec
+    ud.forward.lerp(tmpVec, 0.03).normalize();
+
+    // Move
+    const stepSpeed = ud.speed * 60 * dt; // frame-rate independent
+    fish.position.addScaledVector(ud.forward, stepSpeed);
+
+    // Clamp inside bounds
+    fish.position.x = THREE.MathUtils.clamp(fish.position.x, swimBounds.minX, swimBounds.maxX);
+    fish.position.y = THREE.MathUtils.clamp(fish.position.y, swimBounds.minY, swimBounds.maxY);
+    fish.position.z = THREE.MathUtils.clamp(fish.position.z, swimBounds.minZ, swimBounds.maxZ);
+
+    // Orient fish so its +Z (head) points along forward
+    const lookTarget = new THREE.Vector3().copy(fish.position).add(ud.forward);
+    const m = new THREE.Matrix4();
+    m.lookAt(fish.position, lookTarget, upVec);
+    tmpQuat.setFromRotationMatrix(m);
+    // Flip 180° about Y so the +Z head (instead of default -Z) faces forward
+    tmpQuat.multiply(flipForwardQuat);
+    fish.quaternion.slerp(tmpQuat, 0.08);
+
+    // Banking on Z based on horizontal turn rate
+    const turnRate = ud.forward.x; // rough
+    ud.bankAngle += (turnRate * 0.3 - ud.bankAngle) * 0.05;
+    // Apply banking by rotating around local Z (forward axis)
+    // Add a small extra local rotation
+    const bankQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), ud.bankAngle);
+    fish.quaternion.multiply(bankQuat);
+
+    // Tail wag: oscillate around Y axis at frequency proportional to speed
+    ud.tailPhase += dt * (8 + ud.speed * 600);
+    const wagAmp = 0.35; // ~20°
+    if (ud.tailPivot) {
+      ud.tailPivot.rotation.y = Math.sin(ud.tailPhase) * wagAmp;
+    }
+    // Body slight side undulation
+    // (skipped for simplicity to avoid messing with stripes)
+
+    // Dorsal sway
+    if (ud.dorsalPivot) {
+      ud.dorsalPivot.rotation.y = Math.sin(ud.tailPhase * 0.6) * 0.05;
+    }
+    // Pectoral fin flap
+    if (ud.pecLeft) ud.pecLeft.rotation.z = 0.2 + Math.sin(t * 6 + 1) * 0.25;
+    if (ud.pecRight) ud.pecRight.rotation.z = -0.2 + Math.sin(t * 6) * -0.25;
+  }
+
+  // Bubbles
+  bubbleSpawnTimer += dt;
+  const spawnInterval = 0.18; // ~5/sec total across both streams ~ within 2-4 per stream/sec
+  if (bubbleSpawnTimer > spawnInterval) {
+    bubbleSpawnTimer = 0;
+    if (bubbles.length < 80) spawnBubble();
+  }
+
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    const u = b.userData;
+    b.position.y += u.speed;
+    u.wobblePhase += dt * 2.5;
+    b.position.x = u.baseX + Math.sin(u.wobblePhase) * u.wobbleAmp;
+    b.position.z = u.baseZ + Math.cos(u.wobblePhase * 1.3) * u.wobbleAmp * 0.7;
+    // Shrink slightly as approaches surface
+    const heightProgress = (b.position.y - (-halfH)) / waterH;
+    const sFactor = 1 - heightProgress * 0.3;
+    b.scale.setScalar(Math.max(0.3, sFactor));
+    if (b.position.y > -halfH + waterH - 0.05) {
+      scene.remove(b);
+      b.geometry.dispose();
+      bubbles.splice(i, 1);
+    }
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
 </html>
